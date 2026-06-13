@@ -1,0 +1,6 @@
+{
+  "name": "Arakno CL",
+  "description": "Identificación de arañas de Chile mediante cámara e inteligencia artificial.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
