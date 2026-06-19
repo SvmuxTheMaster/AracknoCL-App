@@ -5,6 +5,7 @@ import android.content.Context
 import com.example.data.AraknoDatabase
 import com.example.data.AraknoRepository
 import com.example.network.SupabaseManager
+import androidx.core.content.edit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -25,6 +26,9 @@ class AraknoApplication : Application() {
 
         applicationScope.launch {
             repository.refreshSpeciesCache()
+            
+            // We don't clear the token here anymore to avoid losing session on network errors.
+            // Validation is handled by AraknoViewModel.
         }
     }
 }

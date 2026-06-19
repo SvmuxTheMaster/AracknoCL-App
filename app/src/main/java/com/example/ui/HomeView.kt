@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,6 +38,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -119,7 +122,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.Avistamiento
 import com.example.data.EspecieArana
 import com.example.data.Usuario
-import com.example.ui.theme.AraknoTheme
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
@@ -204,7 +206,7 @@ fun MainHubView(
                             sightingCount = avistamientos.size,
                             onSaveProfile = { nom, cor, foto, pass, newPass -> 
                                 coroutineScope.launch {
-                                    val result = viewModel.updateProfile(nom, cor, foto, pass, newPass)
+                                    val result = viewModel.updateProfile(nom, cor, foto, newPass)
                                     if (result.isSuccess) {
                                         android.widget.Toast.makeText(context, "Perfil actualizado", android.widget.Toast.LENGTH_SHORT).show()
                                     } else {
@@ -1153,7 +1155,7 @@ fun PerfilScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = if (username.isNotBlank()) username else "Explorador",
+                    text = username.ifBlank { "Explorador" },
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
@@ -1389,7 +1391,7 @@ fun PerfilScreen(
                             email,
                             fotoPerfil,
                             currentPassword,
-                            if (newPassword.isNotBlank()) newPassword else null
+                            newPassword.ifBlank { null }
                         )
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -1469,95 +1471,166 @@ fun AuthScreen(
         return true
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = Icons.Default.Person,
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Fullscreen Background
+        Image(
+            painter = painterResource(id = R.drawable.fondo),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(64.dp)
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = if (isRegistering) "Crear Cuenta Arackno" else "Iniciar Sesión Arackno",
-            color = MaterialTheme.colorScheme.onBackground,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(24.dp))
 
-        if (isRegistering) {
-            OutlinedTextField(
-                value = nombre,
-                onValueChange = { nombre = it; localError = null },
-                label = { Text("Nombre Completo") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
+        // Dark Overlay (25% opacity)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.25f))
+        )
+
+        // Top UI Elements (Logo)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 64.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+        }
+
+        // Bottom Form
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp, vertical = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = if (isRegistering) "CREAR CUENTA" else "INICIAR SESIÓN",
+                color = Color.White,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp
             )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
+            
+            Spacer(modifier = Modifier.height(32.dp))
 
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it; localError = null },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it; localError = null },
-            label = { Text("Contraseña") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
-        )
-
-        val displayError = localError ?: (if (state is AuthState.Error) state.message else null)
-        if (displayError != null) {
-            Text(displayError, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (state is AuthState.Loading) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-        } else {
-            Button(
-                onClick = {
-                    if (validateInputs()) {
-                        if (isRegistering) onRegister(email, password, nombre)
-                        else onLogin(email, password)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
-            ) {
-                Text(if (isRegistering) "Registrarse" else "Entrar", fontWeight = FontWeight.Bold)
-            }
-            TextButton(onClick = {
-                isRegistering = !isRegistering
-                onReset()
-                localError = null
-            }) {
-                Text(
-                    if (isRegistering) "¿Ya tienes cuenta? Inicia sesión" else "¿No tienes cuenta? Regístrate",
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+            if (isRegistering) {
+                CustomAuthTextField(
+                    value = nombre,
+                    onValueChange = { nombre = it; localError = null },
+                    placeholder = "Nombre Completo",
+                    icon = Icons.Default.Person
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            CustomAuthTextField(
+                value = email,
+                onValueChange = { email = it; localError = null },
+                placeholder = "Email",
+                icon = Icons.Default.Email
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            CustomAuthTextField(
+                value = password,
+                onValueChange = { password = it; localError = null },
+                placeholder = "Contraseña",
+                icon = Icons.Default.VpnKey,
+                isPassword = true
+            )
+
+            val displayError = localError ?: (if (state is AuthState.Error) state.message else null)
+            if (displayError != null) {
+                Text(
+                    text = displayError,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(top = 12.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            if (state is AuthState.Loading) {
+                CircularProgressIndicator(color = Color.White)
+            } else {
+                Button(
+                    onClick = {
+                        if (validateInputs()) {
+                            if (isRegistering) onRegister(email, password, nombre)
+                            else onLogin(email, password)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                ) {
+                    Text(
+                        text = if (isRegistering) "REGISTRARSE" else "ENTRAR",
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    )
+                }
+                
+                TextButton(
+                    onClick = {
+                        isRegistering = !isRegistering
+                        onReset()
+                        localError = null
+                    },
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text(
+                        text = if (isRegistering) "¿Ya tienes cuenta? Inicia sesión" else "¿No tienes cuenta? Regístrate",
+                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+fun CustomAuthTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isPassword: Boolean = false
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text(placeholder, color = Color.Gray) },
+        leadingIcon = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        shape = RoundedCornerShape(28.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            disabledContainerColor = Color.White,
+            cursorColor = MaterialTheme.colorScheme.primary,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+            focusedTextColor = Color.Black,
+            unfocusedTextColor = Color.Black
+        ),
+        singleLine = true,
+        visualTransformation = if (isPassword) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None
+    )
 }
 
 @Composable
@@ -2051,7 +2124,7 @@ fun AnalysisOverlayDialog(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = (state as AnalysisState.Error).message,
+                            text = state.message,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center

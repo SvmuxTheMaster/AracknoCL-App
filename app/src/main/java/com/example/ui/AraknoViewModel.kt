@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import androidx.core.content.edit
 
 sealed interface AnalysisState {
     object Idle : AnalysisState
@@ -54,10 +54,34 @@ class AraknoViewModel(private val repository: AraknoRepository) : ViewModel() {
 
     private fun checkInitialSession() {
         viewModelScope.launch {
-            // Use firstOrNull to perform a one-time initial check and avoid state flickering
-            val user = repository.usuario.firstOrNull()
+            // 1. Try to get cached user from DB first (Offline first)
+            var user = repository.usuario.firstOrNull()
             
-            // If there is a cached user with a valid email, consider authenticated
+            // 2. If we have a token, we SHOULD be authenticated. 
+            // We verify in background but don't block the UI if we already have a local user.
+            val token = SupabaseManager.getToken()
+            
+            if (token != null) {
+                // We have a token. If we don't have a user in DB, we MUST fetch it.
+                if (user == null || user.correo == "explorador@arakno.cl") {
+                    val sessionUser = repository.checkSession()
+                    if (sessionUser != null) {
+                        user = sessionUser
+                    }
+                } else {
+                    // We have both token and local user. 
+                    // Validate session asynchronously to refresh data or logout if expired.
+                    launch {
+                        val validatedUser = repository.checkSession()
+                        if (validatedUser == null && SupabaseManager.getToken() == null) {
+                            // Only force idle if the token was explicitly cleared (401)
+                            _authState.value = AuthState.Idle
+                        }
+                    }
+                }
+            }
+
+            // 3. Update auth state
             if (user != null && user.correo.contains("@") && user.correo != "explorador@arakno.cl") {
                 _authState.value = AuthState.Authenticated
             } else {
@@ -133,9 +157,9 @@ class AraknoViewModel(private val repository: AraknoRepository) : ViewModel() {
                 
                 // Persistent session
                 context.getSharedPreferences("arakno_prefs", Context.MODE_PRIVATE)
-                    .edit()
-                    .putString("supabase_token", token)
-                    .apply()
+                    .edit {
+                        putString("supabase_token", token)
+                    }
 
                 // Fetch real profile from Supabase and cache it in Room
                 repository.fetchAndCacheUserProfile(email)
@@ -157,9 +181,9 @@ class AraknoViewModel(private val repository: AraknoRepository) : ViewModel() {
                 if (token.isNotEmpty()) {
                     SupabaseManager.setToken(token)
                     context.getSharedPreferences("arakno_prefs", Context.MODE_PRIVATE)
-                        .edit()
-                        .putString("supabase_token", token)
-                        .apply()
+                        .edit {
+                            putString("supabase_token", token)
+                        }
                 }
 
                 // Insert profile to both Supabase and Room
@@ -176,9 +200,9 @@ class AraknoViewModel(private val repository: AraknoRepository) : ViewModel() {
         repository.signOut()
         _authState.value = AuthState.Idle
         context.getSharedPreferences("arakno_prefs", Context.MODE_PRIVATE)
-            .edit()
-            .remove("supabase_token")
-            .apply()
+            .edit {
+                remove("supabase_token")
+            }
 
         // Clear local user data entirely (no more Explorador de Chile)
         viewModelScope.launch {
@@ -194,7 +218,6 @@ class AraknoViewModel(private val repository: AraknoRepository) : ViewModel() {
         nombre: String,
         correo: String,
         fotoPerfil: String,
-        currentPass: String,
         newPass: String?
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {

@@ -26,6 +26,8 @@ object SupabaseManager {
 
     private var currentUserToken: String? = null
 
+    fun getToken(): String? = currentUserToken
+
     /**
      * Initializes the manager with a stored token (for session persistence).
      */
@@ -152,11 +154,39 @@ object SupabaseManager {
     }
 
     /**
+     * Retrieves the current user details using the stored token.
+     */
+    suspend fun getCurrentUser(): JSONObject? = withContext(Dispatchers.IO) {
+        if (!isConfigured() || currentUserToken == null) return@withContext null
+        try {
+            val url = "${BuildConfig.SUPABASE_URL}/auth/v1/user"
+            val request = Request.Builder()
+                .url(url)
+                .header("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .header("Authorization", "Bearer $currentUserToken")
+                .get()
+                .build()
+
+            val response = okHttpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                return@withContext JSONObject(response.body?.string() ?: "{}")
+            } else if (response.code == 401) {
+                // Token expired or invalid
+                currentUserToken = null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in getCurrentUser", e)
+        }
+        null
+    }
+
+    /**
      * Fetches the user profile from the `usuarios` table.
      */
     suspend fun fetchUserProfile(email: String): JSONObject? = withContext(Dispatchers.IO) {
         try {
-            val url = "${BuildConfig.SUPABASE_URL}/rest/v1/usuarios?correo=eq.$email&select=*"
+            val encodedEmail = android.net.Uri.encode(email)
+            val url = "${BuildConfig.SUPABASE_URL}/rest/v1/usuarios?correo=eq.$encodedEmail&select=*"
             val request = Request.Builder()
                 .url(url)
                 .header("apikey", BuildConfig.SUPABASE_ANON_KEY)
@@ -165,8 +195,11 @@ object SupabaseManager {
                 .build()
 
             val response = okHttpClient.newCall(request).execute()
+            val responseBody = response.body?.string()
+            Log.d(TAG, "fetchUserProfile response: ${response.code} - $responseBody")
+            
             if (response.isSuccessful) {
-                val jsonArray = JSONArray(response.body?.string() ?: "[]")
+                val jsonArray = JSONArray(responseBody ?: "[]")
                 if (jsonArray.length() > 0) {
                     return@withContext jsonArray.getJSONObject(0)
                 }
@@ -187,9 +220,10 @@ object SupabaseManager {
         }
 
         try {
-            val url = "${BuildConfig.SUPABASE_URL}/rest/v1/usuarios"
+            // Use on_conflict=correo to ensure we update the correct user based on email
+            val url = "${BuildConfig.SUPABASE_URL}/rest/v1/usuarios?on_conflict=correo"
             val jsonObject = JSONObject().apply {
-                put("id", usuario.id)
+                // Do NOT send the local ID '1' to Supabase as it will conflict between different users
                 put("nombre", usuario.nombre)
                 put("correo", usuario.correo)
                 put("fecha_registro", usuario.fechaRegistro)
@@ -202,15 +236,16 @@ object SupabaseManager {
             val request = Request.Builder()
                 .url(url)
                 .header("apikey", BuildConfig.SUPABASE_ANON_KEY)
-                .header("Authorization", "Bearer ${BuildConfig.SUPABASE_ANON_KEY}")
+                .header("Authorization", "Bearer ${currentUserToken ?: BuildConfig.SUPABASE_ANON_KEY}")
                 .header("Content-Type", "application/json")
-                .header("Prefer", "resolution=merge-duplicates") // UPSERT
+                .header("Prefer", "resolution=merge-duplicates") 
                 .post(requestBody)
                 .build()
 
             val response = okHttpClient.newCall(request).execute()
+            val responseBody = response.body?.string()
             val success = response.isSuccessful
-            Log.d(TAG, "upsertUsuario success: $success code: ${response.code}")
+            Log.d(TAG, "upsertUsuario response: ${response.code} - $responseBody")
             return@withContext success
         } catch (e: Exception) {
             Log.e(TAG, "Error sync Usuario to Supabase", e)

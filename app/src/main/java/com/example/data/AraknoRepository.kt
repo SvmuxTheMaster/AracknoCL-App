@@ -2,6 +2,7 @@ package com.example.data
 
 import com.example.network.SupabaseManager
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import android.util.Log
 
 /**
@@ -43,10 +44,23 @@ class AraknoRepository(private val dao: AraknoDao) {
             val profileJson = SupabaseManager.fetchUserProfile(email)
             if (profileJson != null) {
                 val name = profileJson.optString("nombre")
-                val user = Usuario(id = 1, nombre = name, correo = email)
+                val foto = profileJson.optString("foto_perfil")
+                
+                // Get existing local user to avoid overwriting fields if remote is empty
+                val existing = dao.getUsuario().firstOrNull()
+                
+                val user = Usuario(
+                    id = 1,
+                    nombre = if (name.isNotEmpty()) name else (existing?.nombre ?: email.substringBefore("@")),
+                    correo = email,
+                    fotoPerfil = if (foto.isNotEmpty()) foto else (existing?.fotoPerfil ?: "")
+                )
                 dao.insertUsuario(user)
                 user
-            } else null
+            } else {
+                // If remote profile not found, don't overwrite local data with empties
+                dao.getUsuario().firstOrNull()
+            }
         } catch (e: Exception) {
             Log.e("Repository", "Error fetching user profile", e)
             null
@@ -88,6 +102,18 @@ class AraknoRepository(private val dao: AraknoDao) {
     }
 
     // --- Authentication ---
+
+    suspend fun checkSession(): Usuario? {
+        val userJson = SupabaseManager.getCurrentUser()
+        if (userJson != null) {
+            val email = userJson.optString("email")
+            if (email.isNotEmpty()) {
+                // Try to get full profile from the custom table
+                return fetchAndCacheUserProfile(email)
+            }
+        }
+        return null
+    }
 
     suspend fun signIn(email: String, pass: String): String? {
         return SupabaseManager.signIn(email, pass)

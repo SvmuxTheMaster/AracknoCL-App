@@ -1,5 +1,6 @@
 package com.example.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -12,24 +13,17 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
@@ -38,21 +32,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import coil.compose.AsyncImage
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -60,6 +50,7 @@ import java.io.InputStream
 import java.nio.ByteBuffer
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import androidx.core.graphics.createBitmap
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -120,10 +111,6 @@ fun CameraView(
                         },
                         onGalleryClick = {
                             imageLauncher.launch("image/*")
-                        },
-                        onDemoSelected = { bitmap ->
-                            capturedBitmap = bitmap
-                            showConfirmation = true
                         }
                     )
                 } else {
@@ -134,10 +121,6 @@ fun CameraView(
                         },
                         onGalleryClick = {
                             imageLauncher.launch("image/*")
-                        },
-                        onDemoSelected = { bitmap ->
-                            capturedBitmap = bitmap
-                            showConfirmation = true
                         }
                     )
                 }
@@ -149,11 +132,10 @@ fun CameraView(
 @Composable
 fun CameraScannerLayout(
     onImageCaptured: (Bitmap) -> Unit,
-    onGalleryClick: () -> Unit,
-    onDemoSelected: (Bitmap) -> Unit
+    onGalleryClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
     val previewView = remember { PreviewView(context) }
     val imageCapture = remember { ImageCapture.Builder().build() }
@@ -262,7 +244,7 @@ fun CameraScannerLayout(
                             .padding(6.dp)
                             .background(MaterialTheme.colorScheme.onPrimary, CircleShape)
                             .clickable {
-                                capturePhoto(context, imageCapture, cameraExecutor, onImageCaptured)
+                                capturePhoto(imageCapture, cameraExecutor, onImageCaptured)
                             }
                             .testTag("shutter_button"),
                         contentAlignment = Alignment.Center
@@ -288,6 +270,7 @@ fun CameraScannerLayout(
     }
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun SpiderScanningOverlay() {
     val infiniteTransition = rememberInfiniteTransition(label = "scanning")
@@ -420,11 +403,9 @@ fun PhotoConfirmationScreen(
 @Composable
 fun NoPermissionScreen(
     onRequestPermission: () -> Unit,
-    onGalleryClick: () -> Unit,
-    onDemoSelected: (Bitmap) -> Unit
+    onGalleryClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -486,7 +467,6 @@ fun NoPermissionScreen(
 }
 
 private fun capturePhoto(
-    context: Context,
     imageCapture: ImageCapture,
     executor: ExecutorService,
     onImageCaptured: (Bitmap) -> Unit
@@ -508,7 +488,7 @@ private fun capturePhoto(
             override fun onError(exception: androidx.camera.core.ImageCaptureException) {
                 Log.e("CameraScannerLayout", "Capture error", exception)
                 // Fallback inside thread
-                val mockBitmap = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888)
+                val mockBitmap = createBitmap(300, 300)
                 onImageCaptured(mockBitmap)
             }
         }
