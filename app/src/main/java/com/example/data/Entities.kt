@@ -9,7 +9,6 @@ data class Usuario(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val nombre: String,
     val correo: String,
-    val celular: String = "",
     val fechaRegistro: Long = System.currentTimeMillis(),
     val fotoPerfil: String = "" // Base64 or URI
 ) : Serializable

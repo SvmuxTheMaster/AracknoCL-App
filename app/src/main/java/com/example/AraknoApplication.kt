@@ -24,7 +24,7 @@ class AraknoApplication : Application() {
         SupabaseManager.setToken(token)
 
         applicationScope.launch {
-            repository.verifyAndSeedDatabase()
+            repository.refreshSpeciesCache()
         }
     }
 }

@@ -1,27 +1,103 @@
 package com.example.ui
 
 import android.graphics.Bitmap
-import androidx.compose.animation.*
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Eco
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.NaturePeople
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PinDrop
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,10 +106,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,8 +119,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.Avistamiento
 import com.example.data.EspecieArana
 import com.example.data.Usuario
+import com.example.ui.theme.AraknoTheme
+import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,11 +144,12 @@ fun MainHubView(
     val analysisState by viewModel.analysisState.collectAsStateWithLifecycle()
 
     var activeTab by remember { mutableStateOf("home") } // "home", "guide", "journal", "profile", "help"
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     // Scaffold with clean cohesive dark theme
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = com.example.ui.theme.JungleDarkBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             AraknoBottomNavigation(
                 activeTab = activeTab,
@@ -110,15 +190,28 @@ fun MainHubView(
                         onDeleteSighting = { viewModel.deleteSighting(it) },
                         onEspecieClick = { scientificName ->
                             val match = allEspecies.firstOrNull { it.nombreCientifico == scientificName }
-                            if (match != null) viewModel.selectEspecie(match)
+                            if (match != null) {
+                                viewModel.selectEspecie(match)
+                            } else {
+                                android.widget.Toast.makeText(context, "Información técnica no disponible para esta especie", android.widget.Toast.LENGTH_SHORT).show()
+                            }
                         }
                     )
                     "profile" -> {
-                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val coroutineScope = rememberCoroutineScope()
                         PerfilScreen(
                             usuario = usuario,
                             sightingCount = avistamientos.size,
-                            onSaveProfile = { nom, cor, cel -> viewModel.updateProfile(nom, cor, cel) },
+                            onSaveProfile = { nom, cor, foto, pass, newPass -> 
+                                coroutineScope.launch {
+                                    val result = viewModel.updateProfile(nom, cor, foto, pass, newPass)
+                                    if (result.isSuccess) {
+                                        android.widget.Toast.makeText(context, "Perfil actualizado", android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        android.widget.Toast.makeText(context, "Error: ${result.exceptionOrNull()?.message}", android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            },
                             onLogout = { viewModel.logout(context) }
                         )
                     }
@@ -157,79 +250,79 @@ fun AraknoBottomNavigation(
     onTabSelected: (String) -> Unit
 ) {
     NavigationBar(
-        containerColor = com.example.ui.theme.FoliageDarkSurface,
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 8.dp,
         modifier = Modifier
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .border(width = 1.dp, color = Color.White.copy(alpha = 0.05f))
+            .border(width = 1.dp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
     ) {
         NavigationBarItem(
             selected = activeTab == "home",
             onClick = { onTabSelected("home") },
-            label = { Text("Inicio", fontSize = 11.sp) },
+            label = { Text("Inicio", style = MaterialTheme.typography.labelSmall) },
             icon = { Icon(Icons.Default.Home, contentDescription = null) },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = com.example.ui.theme.MintHighlight,
-                selectedTextColor = com.example.ui.theme.MintHighlight,
-                unselectedIconColor = Color(0x8AFFFFFF),
-                unselectedTextColor = Color(0x8AFFFFFF),
-                indicatorColor = com.example.ui.theme.CanopyOverlay
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                indicatorColor = MaterialTheme.colorScheme.secondaryContainer
             ),
             modifier = Modifier.testTag("nav_home")
         )
         NavigationBarItem(
             selected = activeTab == "guide",
             onClick = { onTabSelected("guide") },
-            label = { Text("Guía", fontSize = 11.sp) },
-            icon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
+            label = { Text("Guía", style = MaterialTheme.typography.labelSmall) },
+            icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = com.example.ui.theme.MintHighlight,
-                selectedTextColor = com.example.ui.theme.MintHighlight,
-                unselectedIconColor = Color(0x8AFFFFFF),
-                unselectedTextColor = Color(0x8AFFFFFF),
-                indicatorColor = com.example.ui.theme.CanopyOverlay
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                indicatorColor = MaterialTheme.colorScheme.secondaryContainer
             ),
             modifier = Modifier.testTag("nav_guide")
         )
         NavigationBarItem(
             selected = activeTab == "journal",
             onClick = { onTabSelected("journal") },
-            label = { Text("Diario", fontSize = 11.sp) },
+            label = { Text("Diario", style = MaterialTheme.typography.labelSmall) },
             icon = { Icon(Icons.Default.History, contentDescription = null) },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = com.example.ui.theme.MintHighlight,
-                selectedTextColor = com.example.ui.theme.MintHighlight,
-                unselectedIconColor = Color(0x8AFFFFFF),
-                unselectedTextColor = Color(0x8AFFFFFF),
-                indicatorColor = com.example.ui.theme.CanopyOverlay
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                indicatorColor = MaterialTheme.colorScheme.secondaryContainer
             ),
             modifier = Modifier.testTag("nav_journal")
         )
         NavigationBarItem(
             selected = activeTab == "profile",
             onClick = { onTabSelected("profile") },
-            label = { Text("Perfil", fontSize = 11.sp) },
+            label = { Text("Perfil", style = MaterialTheme.typography.labelSmall) },
             icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = com.example.ui.theme.MintHighlight,
-                selectedTextColor = com.example.ui.theme.MintHighlight,
-                unselectedIconColor = Color(0x8AFFFFFF),
-                unselectedTextColor = Color(0x8AFFFFFF),
-                indicatorColor = com.example.ui.theme.CanopyOverlay
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                indicatorColor = MaterialTheme.colorScheme.secondaryContainer
             ),
             modifier = Modifier.testTag("nav_profile")
         )
         NavigationBarItem(
             selected = activeTab == "help",
             onClick = { onTabSelected("help") },
-            label = { Text("Ayuda", fontSize = 11.sp) },
-            icon = { Icon(Icons.Default.HelpOutline, contentDescription = null) },
+            label = { Text("Ayuda", style = MaterialTheme.typography.labelSmall) },
+            icon = { Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = null) },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = com.example.ui.theme.MintHighlight,
-                selectedTextColor = com.example.ui.theme.MintHighlight,
-                unselectedIconColor = Color(0x8AFFFFFF),
-                unselectedTextColor = Color(0x8AFFFFFF),
-                indicatorColor = com.example.ui.theme.CanopyOverlay
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                indicatorColor = MaterialTheme.colorScheme.secondaryContainer
             ),
             modifier = Modifier.testTag("nav_help")
         )
@@ -240,11 +333,11 @@ fun AraknoBottomNavigation(
 fun SupabaseStatusIndicatorVertical() {
     val isConfigured = remember { com.example.network.SupabaseManager.isConfigured() }
     val supabaseUrl = remember { com.example.network.SupabaseManager.getSupabaseUrl() }
-    
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard),
-        border = BorderStroke(1.dp, if (isConfigured) com.example.ui.theme.SafetyLeafGreen else com.example.ui.theme.WarningAmber.copy(alpha = 0.3f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, if (isConfigured) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
@@ -254,20 +347,20 @@ fun SupabaseStatusIndicatorVertical() {
             Box(
                 modifier = Modifier
                     .size(10.dp)
-                    .background(if (isConfigured) com.example.ui.theme.SafetyLeafGreen else com.example.ui.theme.WarningAmber, CircleShape)
+                    .background(if (isConfigured) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary, CircleShape)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(
                     text = if (isConfigured) "Soporte Supabase: Activo" else "Soporte Supabase: Integrado (Modo Local)",
-                    color = com.example.ui.theme.CrispDewDropWhite,
-                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = if (isConfigured) supabaseUrl else "Detección guardará datos localmente y replicará a Supabase al configurar claves.",
-                    color = com.example.ui.theme.FernMutedGray,
-                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -289,7 +382,7 @@ fun HomeScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // App header banner
@@ -297,10 +390,10 @@ fun HomeScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard),
+                    .padding(top = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, com.example.ui.theme.MossGreenAccent.copy(alpha = 0.2f))
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
             ) {
                 Row(
                     modifier = Modifier
@@ -311,28 +404,28 @@ fun HomeScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Hola, ${usuario?.nombre ?: ""}",
-                            color = com.example.ui.theme.MintHighlight,
-                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Has registrado $sightingCount encuentro(s) de arañas.",
-                            color = com.example.ui.theme.CrispDewDropWhite.copy(alpha = 0.7f),
-                            fontSize = 13.sp
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                     Box(
                         modifier = Modifier
                             .size(48.dp)
-                            .background(com.example.ui.theme.CanopyOverlay, CircleShape)
-                            .border(1.dp, com.example.ui.theme.MossGreenAccent, CircleShape),
+                            .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+                            .border(1.dp, MaterialTheme.colorScheme.secondary, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.NaturePeople,
                             contentDescription = null,
-                            tint = com.example.ui.theme.MintHighlight
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -349,12 +442,13 @@ fun HomeScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(171.dp)
-                        .border(3.dp, com.example.ui.theme.MintHighlight.copy(alpha = 0.4f), CircleShape)
+                        .sizeIn(minWidth = 140.dp, minHeight = 140.dp, maxWidth = 200.dp, maxHeight = 200.dp)
+                        .aspectRatio(1f)
+                        .border(3.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), CircleShape)
                         .padding(8.dp)
                         .background(
                             Brush.radialGradient(
-                                colors = listOf(com.example.ui.theme.MintHighlight, com.example.ui.theme.ForestGreenPrimary)
+                                colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
                             ),
                             CircleShape
                         )
@@ -366,25 +460,24 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.CameraAlt,
                             contentDescription = "Escanear ahora con IA",
-                            tint = com.example.ui.theme.JungleDarkBackground,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(52.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "ESCANEAR ARAÑA",
-                            color = com.example.ui.theme.JungleDarkBackground,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Black,
-                            fontSize = 12.sp,
-                            letterSpacing = 1.sp,
                             textAlign = TextAlign.Center
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "Apunta a la araña para identificarla",
-                    color = com.example.ui.theme.FernMutedGray,
-                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
@@ -395,8 +488,8 @@ fun HomeScreen(
         item {
             Text(
                 text = "Accesos Rápidos",
-                color = com.example.ui.theme.CrispDewDropWhite,
-                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 4.dp)
             )
@@ -411,9 +504,9 @@ fun HomeScreen(
                 Card(
                     modifier = Modifier
                         .weight(1f)
-                        .height(115.dp)
+                        .heightIn(min = 110.dp)
                         .clickable { onNavigateToGuide() },
-                    colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(
                         modifier = Modifier
@@ -422,22 +515,22 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         Icon(
-                            imageVector = Icons.Default.MenuBook,
+                            imageVector = Icons.AutoMirrored.Filled.MenuBook,
                             contentDescription = null,
-                            tint = com.example.ui.theme.MintHighlight
+                            tint = MaterialTheme.colorScheme.primary
                         )
                         Column {
                             Text(
                                 "Guía de Especies",
-                                color = com.example.ui.theme.CrispDewDropWhite,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
                                 "Fichas técnicas y hábitats",
-                                color = com.example.ui.theme.FernMutedGray,
-                                fontSize = 10.sp,
-                                maxLines = 1,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
@@ -448,9 +541,9 @@ fun HomeScreen(
                 Card(
                     modifier = Modifier
                         .weight(1f)
-                        .height(115.dp)
+                        .heightIn(min = 110.dp)
                         .clickable { onNavigateToJournal() },
-                    colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(
                         modifier = Modifier
@@ -461,20 +554,20 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.History,
                             contentDescription = null,
-                            tint = com.example.ui.theme.MintHighlight
+                            tint = MaterialTheme.colorScheme.primary
                         )
                         Column {
                             Text(
                                 "Mi Diario",
-                                color = com.example.ui.theme.CrispDewDropWhite,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
                                 "Tus capturas guardadas",
-                                color = com.example.ui.theme.FernMutedGray,
-                                fontSize = 10.sp,
-                                maxLines = 1,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
@@ -489,7 +582,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onQuickFaqClick() },
-                colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Row(
@@ -499,33 +592,33 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .background(com.example.ui.theme.MintHighlight.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.MenuBook,
+                            imageVector = Icons.AutoMirrored.Filled.MenuBook,
                             contentDescription = null,
-                            tint = com.example.ui.theme.MintHighlight
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "¿Venenoso vs Peligroso?",
-                            color = com.example.ui.theme.CrispDewDropWhite,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "Aprende la diferencia en la guía de ayuda",
-                            color = com.example.ui.theme.FernMutedGray,
-                            fontSize = 11.sp
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall
                         )
                     }
                     Icon(
                         imageVector = Icons.AutoMirrored.Default.ArrowForward,
                         contentDescription = null,
-                        tint = com.example.ui.theme.CrispDewDropWhite.copy(alpha = 0.4f),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -551,15 +644,15 @@ fun GuiaInformativaScreen(
     ) {
         Text(
             text = "Guía de Especies",
-            color = Color.White,
-            fontSize = 22.sp,
+            color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Text(
             text = "Arañas más comunes registradas en Chile y su nivel de riesgo.",
-            color = Color.White.copy(alpha = 0.6f),
-            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+            style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
@@ -568,11 +661,11 @@ fun GuiaInformativaScreen(
             value = searchQuery,
             onValueChange = onSearchChanged,
             placeholder = { Text("Buscar por nombre, familia...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.LightGray) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             trailingIcon = if (searchQuery.isNotEmpty()) {
                 {
                     IconButton(onClick = { onSearchChanged("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Limpiar", tint = Color.LightGray)
+                        Icon(Icons.Default.Clear, contentDescription = "Limpiar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else null,
@@ -581,12 +674,12 @@ fun GuiaInformativaScreen(
                 .padding(bottom = 16.dp)
                 .testTag("search_bar"),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = com.example.ui.theme.BarkDarkCard,
-                unfocusedContainerColor = com.example.ui.theme.BarkDarkCard,
-                focusedBorderColor = com.example.ui.theme.MintHighlight,
-                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
             singleLine = true,
             shape = RoundedCornerShape(12.dp)
@@ -596,6 +689,7 @@ fun GuiaInformativaScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -605,7 +699,7 @@ fun GuiaInformativaScreen(
                 Box(
                     modifier = Modifier
                         .background(
-                            color = if (isSelected) com.example.ui.theme.MintHighlight else com.example.ui.theme.FoliageDarkSurface,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(16.dp)
                         )
                         .clickable { onFilterSelected(filter) }
@@ -615,8 +709,8 @@ fun GuiaInformativaScreen(
                 ) {
                     Text(
                         text = filter,
-                        color = if (isSelected) com.example.ui.theme.JungleDarkBackground else com.example.ui.theme.CrispDewDropWhite.copy(alpha = 0.8f),
-                        fontSize = 12.sp,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -632,9 +726,9 @@ fun GuiaInformativaScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Info, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(48.dp))
+                    Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f), modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("No se encontraron especies", color = Color.White.copy(alpha = 0.5f), fontSize = 14.sp)
+                    Text("No se encontraron especies", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         } else {
@@ -660,7 +754,7 @@ fun SpiderListItem(
             .fillMaxWidth()
             .clickable { onClick() }
             .testTag("spider_item_${especie.nombreCientifico.replace(" ", "_")}"),
-        colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
@@ -669,16 +763,16 @@ fun SpiderListItem(
         ) {
             // Stylized safety warning indicator icon
             val colorAlert = when (especie.nivelPeligrosidad) {
-                "Extrema" -> com.example.ui.theme.HazardToxicityRed
-                "Alta" -> com.example.ui.theme.WarningAmber
-                "Media" -> Color(0xFFF39C12) // Scientific warning gold
-                else -> com.example.ui.theme.SafetyLeafGreen
+                "Extrema" -> MaterialTheme.colorScheme.error
+                "Alta" -> MaterialTheme.colorScheme.secondary
+                "Media" -> MaterialTheme.colorScheme.tertiary
+                else -> MaterialTheme.colorScheme.primary
             }
 
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .background(com.example.ui.theme.CanopyOverlay, CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
                     .border(1.5.dp, colorAlert, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -698,25 +792,25 @@ fun SpiderListItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = especie.nombreComun,
-                    color = com.example.ui.theme.CrispDewDropWhite,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = especie.nombreCientifico,
-                    color = com.example.ui.theme.FernMutedGray,
-                    fontStyle = FontStyle.Italic,
-                    fontSize = 12.sp
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontStyle = FontStyle.Italic
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     // Origin Badge
                     Box(
                         modifier = Modifier
-                            .background(com.example.ui.theme.JungleDarkBackground, RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(4.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(especie.origen, color = com.example.ui.theme.MintHighlight, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text(especie.origen, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
                     // Danger level Badge
                     Box(
@@ -727,7 +821,7 @@ fun SpiderListItem(
                         Text(
                             text = "Riesgo: ${especie.nivelPeligrosidad}",
                             color = colorAlert,
-                            fontSize = 9.sp,
+                            style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -737,7 +831,7 @@ fun SpiderListItem(
             Icon(
                 imageVector = Icons.AutoMirrored.Default.ArrowForward,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.3f),
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
                 modifier = Modifier.size(16.dp)
             )
         }
@@ -758,15 +852,15 @@ fun MiDiarioScreen(
     ) {
         Text(
             text = "Mi Diario de Arañas",
-            color = Color.White,
-            fontSize = 22.sp,
+            color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
             text = "Historial de encuentros identificados en terreno.",
-            color = Color.White.copy(alpha = 0.6f),
-            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+            style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
@@ -778,19 +872,19 @@ fun MiDiarioScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Camera, contentDescription = null, tint = Color.White.copy(alpha = 0.25f), modifier = Modifier.size(56.dp))
+                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f), modifier = Modifier.size(56.dp))
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "Aún no tienes encuentros registrados",
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Usa el scanner de cámara para registrar tu primera araña",
-                        color = Color.White.copy(alpha = 0.4f),
-                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 32.dp)
                     )
@@ -828,7 +922,7 @@ fun SightingItem(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("sighting_item_${avistamiento.id}"),
-        colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -840,14 +934,14 @@ fun SightingItem(
                     Icon(
                         imageVector = Icons.Default.PinDrop,
                         contentDescription = null,
-                        tint = com.example.ui.theme.MintHighlight,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = avistamiento.ubicacionNombre,
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -856,7 +950,7 @@ fun SightingItem(
                     onClick = onDeleteClick,
                     modifier = Modifier.size(24.dp).testTag("delete_sighting_${avistamiento.id}")
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -867,45 +961,45 @@ fun SightingItem(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .background(com.example.ui.theme.CanopyOverlay, RoundedCornerShape(8.dp))
-                        .border(1.dp, com.example.ui.theme.MintHighlight.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                        .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(8.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.NaturePeople, contentDescription = null, tint = com.example.ui.theme.MintHighlight, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.NaturePeople, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = avistamiento.resultadoNombreComun,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = avistamiento.resultadoEspecie,
-                        color = com.example.ui.theme.FernMutedGray,
-                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
                         fontStyle = FontStyle.Italic
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Box(
                         modifier = Modifier
-                            .background(com.example.ui.theme.SafetyLeafGreen.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = "${(avistamiento.confianza * 100).toInt()}% Confianza",
-                            color = com.example.ui.theme.SafetyLeafGreen,
-                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = dateString,
-                        color = Color.White.copy(alpha = 0.4f),
-                        fontSize = 10.sp
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        style = MaterialTheme.typography.labelSmall
                     )
                 }
             }
@@ -914,24 +1008,24 @@ fun SightingItem(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = avistamiento.comentarios,
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
                     fontStyle = FontStyle.Normal,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(com.example.ui.theme.JungleDarkBackground, RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.background, RoundedCornerShape(6.dp))
                         .padding(8.dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = "Ver ficha científica completa →",
-                color = com.example.ui.theme.MintHighlight,
-                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.End,
                 modifier = Modifier
@@ -947,34 +1041,64 @@ fun SightingItem(
 fun PerfilScreen(
     usuario: Usuario?,
     sightingCount: Int,
-    onSaveProfile: (String, String, String) -> Unit,
+    onSaveProfile: (String, String, String, String, String?) -> Unit,
     onLogout: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var isEditing by remember { mutableStateOf(false) }
 
     var username by remember(usuario?.nombre) { mutableStateOf(usuario?.nombre ?: "") }
     var email by remember(usuario?.correo) { mutableStateOf(usuario?.correo ?: "") }
-    var phone by remember(usuario?.celular) { mutableStateOf(usuario?.celular ?: "") }
+    var fotoPerfil by remember(usuario?.fotoPerfil) { mutableStateOf(usuario?.fotoPerfil ?: "") }
+    
+    val photoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            try {
+                val inputStream = context.contentResolver.openInputStream(it)
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
+
+                if (bitmap != null) {
+                    val outputStream = ByteArrayOutputStream()
+                    // Compress to reduce size for Base64 storage
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+                    val byteArray = outputStream.toByteArray()
+                    fotoPerfil = Base64.encodeToString(byteArray, Base64.DEFAULT)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmNewPassword by remember { mutableStateOf("") }
+
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         Text(
             text = "Perfil del Explorador",
-            color = Color.White,
-            fontSize = 22.sp,
+            color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // Count box with elegant visual design
+        // Profile Header / Avatar
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 24.dp),
-            colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier
@@ -984,29 +1108,64 @@ fun PerfilScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
-                        .background(com.example.ui.theme.MintHighlight.copy(alpha = 0.15f), CircleShape)
-                        .border(1.5.dp, com.example.ui.theme.MintHighlight, CircleShape),
+                        .size(100.dp)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape)
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        .clip(CircleShape)
+                        .clickable(enabled = isEditing) {
+                            photoLauncher.launch("image/*")
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.AccountCircle, contentDescription = null, tint = com.example.ui.theme.MintHighlight, modifier = Modifier.size(44.dp))
+                    if (fotoPerfil.isNotEmpty()) {
+                        val bitmap = try {
+                            val decodedString = Base64.decode(fotoPerfil, Base64.DEFAULT)
+                            BitmapFactory.decodeByteArray(decodedString, 0, decodedString.size)
+                        } catch (e: Exception) {
+                            null
+                        }
+
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(Icons.Default.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(60.dp))
+                        }
+                    } else {
+                        Icon(Icons.Default.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(60.dp))
+                    }
+
+                    if (isEditing) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.surface, modifier = Modifier.size(32.dp))
+                        }
+                    }
                 }
+
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = username,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
+                    text = if (username.isNotBlank()) username else "Explorador",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Miembro activo de Arakno CL",
-                    color = com.example.ui.theme.FernMutedGray,
-                    fontSize = 12.sp
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(
@@ -1016,117 +1175,261 @@ fun PerfilScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = sightingCount.toString(),
-                            color = com.example.ui.theme.MintHighlight,
-                            fontSize = 32.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Black
                         )
                         Text(
                             text = "Encuentros",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 11.sp
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.labelSmall
                         )
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "Chile",
-                            color = Color.White,
-                            fontSize = 28.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         Text(
                             text = "Territorio",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 11.sp
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.labelSmall
                         )
                     }
                 }
             }
         }
 
-        // Editable details form
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard)
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                if (isEditing) {
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (isEditing) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // Section 1: Basic Info
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Información Básica", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
                     OutlinedTextField(
                         value = username,
                         onValueChange = { username = it },
-                        label = { Text("Nombre") },
-                        modifier = Modifier.fillMaxWidth().testTag("profile_name_edit"),
+                        label = { Text("Nombre de usuario") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = com.example.ui.theme.MintHighlight
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface, 
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
                         )
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
                         label = { Text("Correo electrónico") },
-                        modifier = Modifier.fillMaxWidth().testTag("profile_email_edit"),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = com.example.ui.theme.MintHighlight
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface, 
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
                         )
                     )
-                    OutlinedTextField(
-                        value = phone,
-                        onValueChange = { phone = it },
-                        label = { Text("Celular de contacto") },
-                        modifier = Modifier.fillMaxWidth().testTag("profile_phone_edit"),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = com.example.ui.theme.MintHighlight
-                        )
-                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    Button(
-                        onClick = {
-                            onSaveProfile(username, email, phone)
-                            isEditing = false
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.MintHighlight, contentColor = com.example.ui.theme.JungleDarkBackground),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth().testTag("profile_save_button")
-                    ) {
-                        Text("Guardar Cambios", fontWeight = FontWeight.Bold)
+                    // Section 2: Security
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.VpnKey, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Seguridad y Contraseña", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     }
-                } else {
-                    ProfileField(label = "Correo electrónico", valStr = email, icon = Icons.Default.Email)
-                    ProfileField(label = "Celular de contacto", valStr = phone, icon = Icons.Default.Phone)
-
-                    Button(
-                        onClick = { isEditing = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp)
-                            .testTag("profile_edit_toggle")
-                    ) {
-                        Text("Editar información de contacto", fontWeight = FontWeight.Medium)
-                    }
-
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    OutlinedButton(
-                        onClick = onLogout,
+                    OutlinedTextField(
+                        value = currentPassword,
+                        onValueChange = { currentPassword = it },
+                        label = { Text("Contraseña actual (Requerida)") },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = com.example.ui.theme.WarningAmber),
-                        border = BorderStroke(1.dp, com.example.ui.theme.WarningAmber.copy(alpha = 0.5f))
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface, 
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.03f), RoundedCornerShape(12.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                            .padding(12.dp)
                     ) {
-                        Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Cerrar Sesión")
+                        Column {
+                            Text(
+                                "Cambiar Contraseña", 
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelMedium, 
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "Completa ambos campos solo si deseas cambiarla", 
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            OutlinedTextField(
+                                value = newPassword,
+                                onValueChange = { newPassword = it },
+                                label = { Text("Nueva contraseña") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(8.dp),
+                                visualTransformation = PasswordVisualTransformation(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface, 
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = confirmNewPassword,
+                                onValueChange = { confirmNewPassword = it },
+                                label = { Text("Confirmar nueva contraseña") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(8.dp),
+                                visualTransformation = PasswordVisualTransformation(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface, 
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                                )
+                            )
+                        }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            errorMessage?.let {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        isEditing = false
+                        errorMessage = null
+                        currentPassword = ""
+                        newPassword = ""
+                        confirmNewPassword = ""
+                    },
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+                ) {
+                    Text("Cancelar")
+                }
+
+                Button(
+                    onClick = {
+                        if (currentPassword.isEmpty()) {
+                            errorMessage = "Se requiere contraseña actual para guardar cambios"
+                            return@Button
+                        }
+                        if (newPassword.isNotEmpty() && newPassword != confirmNewPassword) {
+                            errorMessage = "Las nuevas contraseñas no coinciden"
+                            return@Button
+                        }
+
+                        onSaveProfile(
+                            username,
+                            email,
+                            fotoPerfil,
+                            currentPassword,
+                            if (newPassword.isNotBlank()) newPassword else null
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    modifier = Modifier.weight(1.2f).height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                ) {
+                    Text("Guardar Cambios", fontWeight = FontWeight.Bold)
+                }
+            }
+        } else {
+            ProfileField(label = "Nombre", valStr = username, icon = Icons.Default.Person)
+            ProfileField(label = "Correo electrónico", valStr = email, icon = Icons.Default.Email)
+
+            Button(
+                onClick = { isEditing = true },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), contentColor = MaterialTheme.colorScheme.onSurface),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp)
+                    .testTag("profile_edit_toggle")
+            ) {
+                Text("Editar Perfil", fontWeight = FontWeight.Medium)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = onLogout,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.secondary),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f))
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Cerrar Sesión")
             }
         }
     }
@@ -1169,21 +1472,23 @@ fun AuthScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
-            imageVector = Icons.Default.VpnKey,
+            imageVector = Icons.Default.Person,
             contentDescription = null,
-            tint = com.example.ui.theme.MintHighlight,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(64.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = if (isRegistering) "Crear Cuenta Supabase" else "Iniciar Sesión Supabase",
-            color = Color.White,
-            fontSize = 20.sp,
+            text = if (isRegistering) "Crear Cuenta Arackno" else "Iniciar Sesión Arackno",
+            color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(24.dp))
@@ -1194,7 +1499,8 @@ fun AuthScreen(
                 onValueChange = { nombre = it; localError = null },
                 label = { Text("Nombre Completo") },
                 modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -1204,7 +1510,8 @@ fun AuthScreen(
             onValueChange = { email = it; localError = null },
             label = { Text("Email") },
             modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
         )
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(
@@ -1212,19 +1519,20 @@ fun AuthScreen(
             onValueChange = { password = it; localError = null },
             label = { Text("Contraseña") },
             modifier = Modifier.fillMaxWidth(),
-            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
         )
 
         val displayError = localError ?: (if (state is AuthState.Error) state.message else null)
         if (displayError != null) {
-            Text(displayError, color = com.example.ui.theme.WarningAmber, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+            Text(displayError, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         if (state is AuthState.Loading) {
-            CircularProgressIndicator(color = com.example.ui.theme.MintHighlight)
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         } else {
             Button(
                 onClick = {
@@ -1234,18 +1542,18 @@ fun AuthScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.MintHighlight, contentColor = com.example.ui.theme.JungleDarkBackground)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) {
                 Text(if (isRegistering) "Registrarse" else "Entrar", fontWeight = FontWeight.Bold)
             }
-            TextButton(onClick = { 
-                isRegistering = !isRegistering 
+            TextButton(onClick = {
+                isRegistering = !isRegistering
                 onReset()
                 localError = null
             }) {
                 Text(
                     if (isRegistering) "¿Ya tienes cuenta? Inicia sesión" else "¿No tienes cuenta? Regístrate",
-                    color = com.example.ui.theme.MintHighlight.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                 )
             }
         }
@@ -1258,11 +1566,11 @@ fun ProfileField(label: String, valStr: String, icon: androidx.compose.ui.graphi
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
         Spacer(modifier = Modifier.width(12.dp))
         Column {
-            Text(label, color = Color.White.copy(alpha = 0.4f), fontSize = 11.sp)
-            Text(valStr, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(label, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), style = MaterialTheme.typography.labelSmall)
+            Text(valStr, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -1300,15 +1608,15 @@ fun AyudaFaqScreen() {
     ) {
         Text(
             text = "¿Qué quieres aprender hoy?",
-            color = Color.White,
-            fontSize = 22.sp,
+            color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
             text = "Herramientas de educación y prevención para la comunidad de Chile.",
-            color = Color.White.copy(alpha = 0.6f),
-            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+            style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
@@ -1334,7 +1642,7 @@ fun FaqExpandableCard(faq: FaqData) {
             .fillMaxWidth()
             .clickable { expanded = !expanded }
             .testTag("faq_card_${faq.id}"),
-        colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -1344,15 +1652,15 @@ fun FaqExpandableCard(faq: FaqData) {
             ) {
                 Text(
                     text = faq.pregunta,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
                     modifier = Modifier.weight(1f)
                 )
                 Icon(
                     imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = null,
-                    tint = com.example.ui.theme.MintHighlight
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -1363,12 +1671,12 @@ fun FaqExpandableCard(faq: FaqData) {
             ) {
                 Column {
                     Spacer(modifier = Modifier.height(10.dp))
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = faq.respuesta,
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodySmall,
                         lineHeight = 18.sp
                     )
                 }
@@ -1390,16 +1698,20 @@ fun FichaTecnicaDialog(
     ) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = com.example.ui.theme.JungleDarkBackground,
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text("Ficha Técnica Científica", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+                    title = { Text("Ficha Técnica Científica", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss, modifier = Modifier.testTag("ficha_dismiss_button")) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = com.example.ui.theme.FoliageDarkSurface)
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
             }
         ) { innerPadding ->
@@ -1413,10 +1725,10 @@ fun FichaTecnicaDialog(
                 // Header with main tags
                 item {
                     val colorAlert = when (especie.nivelPeligrosidad) {
-                        "Extrema" -> com.example.ui.theme.HazardToxicityRed
-                        "Alta" -> com.example.ui.theme.WarningAmber
-                        "Media" -> Color(0xFFF39C12)
-                        else -> com.example.ui.theme.SafetyLeafGreen
+                        "Extrema" -> MaterialTheme.colorScheme.error
+                        "Alta" -> MaterialTheme.colorScheme.secondary
+                        "Media" -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.primary
                     }
 
                     Column(
@@ -1426,14 +1738,14 @@ fun FichaTecnicaDialog(
                     ) {
                         Text(
                             text = especie.nombreComun,
-                            color = Color.White,
-                            fontSize = 24.sp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Black
                         )
                         Text(
                             text = especie.nombreCientifico,
-                            color = com.example.ui.theme.MintHighlight,
-                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.titleMedium,
                             fontStyle = FontStyle.Italic,
                             fontWeight = FontWeight.Medium
                         )
@@ -1454,9 +1766,9 @@ fun FichaTecnicaDialog(
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Text(
-                                    text = "Riesgo: ${especie.nivelPeligrosidad.uppercase()}",
+                                    text = "RIESGO: ${especie.nivelPeligrosidad.uppercase()}",
                                     color = colorAlert,
-                                    fontSize = 11.sp,
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Black
                                 )
                             }
@@ -1464,14 +1776,14 @@ fun FichaTecnicaDialog(
                             // Venomous Indicator
                             Box(
                                 modifier = Modifier
-                                    .background(com.example.ui.theme.CanopyOverlay, RoundedCornerShape(6.dp))
-                                    .border(1.dp, com.example.ui.theme.MintHighlight, RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp))
+                                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Text(
                                     text = if (especie.venenosa) "SÍNTESIS DE VENENO" else "SIN GLÁNDULA",
-                                    color = com.example.ui.theme.MintHighlight,
-                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -1479,14 +1791,14 @@ fun FichaTecnicaDialog(
                             // Origin Indicator
                             Box(
                                 modifier = Modifier
-                                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
-                                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Text(
                                     text = "ORIGEN: ${especie.origen.uppercase()}",
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -1494,7 +1806,7 @@ fun FichaTecnicaDialog(
                     }
                 }
 
-                item { HorizontalDivider(color = Color.White.copy(alpha = 0.08f)) }
+                item { HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)) }
 
                 // Family & Description card
                 item {
@@ -1546,16 +1858,16 @@ fun FichaSection(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = com.example.ui.theme.MintHighlight, modifier = Modifier.size(18.dp))
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(10.dp))
-            Text(content, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, lineHeight = 18.sp)
+            Text(content, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall, lineHeight = 18.sp)
         }
     }
 }
@@ -1575,9 +1887,9 @@ fun AnalysisOverlayDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.BarkDarkCard),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, com.example.ui.theme.MintHighlight.copy(alpha = 0.2f))
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
         ) {
             Column(
                 modifier = Modifier
@@ -1591,73 +1903,73 @@ fun AnalysisOverlayDialog(
                     is AnalysisState.Loading -> {
                         // Loading Animation (HU04 - "Carga")
                         CircularProgressIndicator(
-                            color = com.example.ui.theme.MintHighlight,
+                            color = MaterialTheme.colorScheme.primary,
                             strokeWidth = 3.5.dp,
                             modifier = Modifier.size(54.dp).testTag("analysis_loading")
                         )
                         Spacer(modifier = Modifier.height(20.dp))
                         Text(
                             text = "Analizando Araña...",
-                            color = Color.White,
-                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Arakno CL IA está consultando modelos de reconocimiento biológico...",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(horizontal = 12.dp)
                         )
                     }
                     is AnalysisState.Success -> {
                         val result = state.result
-                        
+
                         if (result.spiderFound && result.especie != null) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = com.example.ui.theme.SafetyLeafGreen,
+                                tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(54.dp).testTag("analysis_success_icon")
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "¡Identificación Exitosa!",
-                                color = Color.White,
-                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            
+
                             // Identified Card
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                                colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.JungleDarkBackground)
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(
                                         result.especie.nombreComun,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
                                     )
                                     Text(
                                         result.especie.nombreCientifico,
-                                        color = com.example.ui.theme.MintHighlight,
-                                        fontStyle = FontStyle.Italic,
-                                        fontSize = 13.sp
+                                        color = MaterialTheme.colorScheme.primary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontStyle = FontStyle.Italic
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         "Riesgo: ${result.especie.nivelPeligrosidad}",
                                         color = when (result.especie.nivelPeligrosidad) {
-                                            "Extrema" -> com.example.ui.theme.HazardToxicityRed
-                                            "Alta" -> com.example.ui.theme.WarningAmber
-                                            else -> com.example.ui.theme.SafetyLeafGreen
+                                            "Extrema" -> MaterialTheme.colorScheme.error
+                                            "Alta" -> MaterialTheme.colorScheme.secondary
+                                            else -> MaterialTheme.colorScheme.tertiary
                                         },
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 13.sp
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Black
                                     )
                                 }
                             }
@@ -1665,16 +1977,16 @@ fun AnalysisOverlayDialog(
                             if (result.mensajeOriginal != null) {
                                 Text(
                                     text = result.mensajeOriginal,
-                                    color = Color.White.copy(alpha = 0.5f),
-                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                    style = MaterialTheme.typography.labelSmall,
                                     modifier = Modifier.padding(bottom = 12.dp)
                                 )
                             }
-                            
+
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Button(
                                     onClick = onDismiss,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f), contentColor = Color.White),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), contentColor = MaterialTheme.colorScheme.onSurface),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.weight(1f).testTag("dismiss_analysis")
                                 ) {
@@ -1682,7 +1994,7 @@ fun AnalysisOverlayDialog(
                                 }
                                 Button(
                                     onClick = { onViewFicha(result.especie) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.MintHighlight, contentColor = com.example.ui.theme.JungleDarkBackground),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.weight(1.2f).testTag("view_ficha_analysis")
                                 ) {
@@ -1694,28 +2006,28 @@ fun AnalysisOverlayDialog(
                             Icon(
                                 imageVector = Icons.Default.Info,
                                 contentDescription = null,
-                                tint = com.example.ui.theme.MintHighlight,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(54.dp).testTag("analysis_not_found_icon")
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "No se detectó araña",
-                                color = Color.White,
-                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "El modelo no logró reconocer una araña con certeza suficiente en esta imagen. Intenta capturar una foto más cercana o con mejor luz.",
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                style = MaterialTheme.typography.bodySmall,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(horizontal = 8.dp)
                             )
                             Spacer(modifier = Modifier.height(18.dp))
                             Button(
                                 onClick = onDismiss,
-                                colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.MintHighlight, contentColor = com.example.ui.theme.JungleDarkBackground),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth().testTag("close_analysis_not_found")
                             ) {
@@ -1727,27 +2039,27 @@ fun AnalysisOverlayDialog(
                         Icon(
                             imageVector = Icons.Default.Error,
                             contentDescription = null,
-                            tint = Color.Red,
+                            tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(54.dp).testTag("analysis_error_icon")
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "Ocurrió un error",
-                            color = Color.White,
-                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = (state as AnalysisState.Error).message,
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(18.dp))
                         Button(
                             onClick = onDismiss,
-                            colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.MintHighlight, contentColor = com.example.ui.theme.JungleDarkBackground),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.fillMaxWidth().testTag("close_analysis_error")
                         ) {

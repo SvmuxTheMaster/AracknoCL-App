@@ -19,6 +19,9 @@ interface AraknoDao {
     @Update
     suspend fun updateUsuario(usuario: Usuario)
 
+    @Query("DELETE FROM usuarios")
+    suspend fun clearUsuario()
+
     // --- Especie de Araña Queries ---
     @Query("SELECT * FROM especies_arana ORDER BY nombreComun ASC")
     fun getAllEspecies(): Flow<List<EspecieArana>>
@@ -31,6 +34,9 @@ interface AraknoDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEspecies(especies: List<EspecieArana>)
+
+    @Query("DELETE FROM especies_arana")
+    suspend fun deleteAllEspecies()
 
     // --- Avistamiento Queries ---
     @Query("SELECT * FROM avistamientos ORDER BY fechaCaptura DESC")

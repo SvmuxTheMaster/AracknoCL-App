@@ -101,11 +101,50 @@ object SupabaseManager {
                 val token = json.optString("access_token", null)
                 currentUserToken = token
                 return@withContext token
+            } else {
+                Log.e(TAG, "signIn failed: ${response.code} - ${response.body?.string()}")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in signIn", e)
         }
         null
+    }
+
+    /**
+     * Updates the current user's email, password, or metadata.
+     * Requires the current valid token to be set.
+     */
+    suspend fun updateProfile(
+        newEmail: String? = null,
+        newPassword: String? = null,
+        metadata: JSONObject? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (!isConfigured() || currentUserToken == null) return@withContext false
+        try {
+            val url = "${BuildConfig.SUPABASE_URL}/auth/v1/user"
+            val jsonObject = JSONObject()
+            newEmail?.let { jsonObject.put("email", it) }
+            newPassword?.let { jsonObject.put("password", it) }
+            metadata?.let { jsonObject.put("data", it) }
+
+            val requestBody = jsonObject.toString().toRequestBody("application/json".toMediaType())
+            val request = Request.Builder()
+                .url(url)
+                .header("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .header("Authorization", "Bearer $currentUserToken")
+                .put(requestBody)
+                .build()
+
+            val response = okHttpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                return@withContext true
+            } else {
+                Log.e(TAG, "updateProfile failed: ${response.code} - ${response.body?.string()}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in updateProfile", e)
+        }
+        false
     }
 
     fun signOut() {
@@ -116,10 +155,6 @@ object SupabaseManager {
      * Fetches the user profile from the `usuarios` table.
      */
     suspend fun fetchUserProfile(email: String): JSONObject? = withContext(Dispatchers.IO) {
-        if (!isConfigured()) return@withContext JSONObject().apply {
-            put("nombre", "Usuario Simulado")
-            put("correo", email)
-        }
         try {
             val url = "${BuildConfig.SUPABASE_URL}/rest/v1/usuarios?correo=eq.$email&select=*"
             val request = Request.Builder()
@@ -157,7 +192,6 @@ object SupabaseManager {
                 put("id", usuario.id)
                 put("nombre", usuario.nombre)
                 put("correo", usuario.correo)
-                put("celular", usuario.celular)
                 put("fecha_registro", usuario.fechaRegistro)
                 put("foto_perfil", usuario.fotoPerfil)
             }

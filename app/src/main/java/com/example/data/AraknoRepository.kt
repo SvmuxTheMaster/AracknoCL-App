@@ -1,103 +1,55 @@
 package com.example.data
 
+import com.example.network.SupabaseManager
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.take
+import android.util.Log
 
+/**
+ * Single source of truth for all data in the Arakno app.
+ * Follows the Repository Pattern to abstract the data sources (Room cache + Supabase backend).
+ */
 class AraknoRepository(private val dao: AraknoDao) {
 
+    // --- Observable Data Streams (Room Cache as Single Source of Truth for the UI) ---
     val usuario: Flow<Usuario?> = dao.getUsuario()
     val allEspecies: Flow<List<EspecieArana>> = dao.getAllEspecies()
     val allAvistamientos: Flow<List<Avistamiento>> = dao.getAllAvistamientos()
 
-    suspend fun verifyAndSeedDatabase() {
-        // We'll check if the species table is empty, and seed it if so
-        val currentEspecies = dao.getAllEspecies().take(1).firstOrNull()
-        if (currentEspecies.isNullOrEmpty()) {
-            val initialEspecies = listOf(
-                EspecieArana(
-                    nombreCientifico = "Loxosceles laeta",
-                    nombreComun = "Araña de rincón",
-                    familia = "Sicariidae",
-                    descripcion = "Es de color marrón brillante con una marca característica en forma de violín invertido en el cefalotórax. Extremadamente rápida y de hábitos nocturnos. Su mordedura provoca loxoscelismo cutáneo o visceral, con potencial dermonecrótico y hemolítico grave.",
-                    nivelPeligrosidad = "Extrema",
-                    venenosa = true,
-                    habitat = "Detrás de cuadros, rincones oscuros, closets, zócalos y en general zonas interiores del hogar de baja ventilación.",
-                    distribucion = "En todo el territorio nacional urbano y semiurbano chileno.",
-                    origen = "Exótico"
-                ),
-                EspecieArana(
-                    nombreCientifico = "Latrodectus mactans",
-                    nombreComun = "Araña de trigo / Viuda negra del sur",
-                    familia = "Theridiidae",
-                    descripcion = "Cuerpo negro brillante, de abdomen globular con notorias manchas rojas o anaranjadas (a menudo en forma de reloj de arena). Su veneno posee alfa-latrotoxina neurotóxica, causando contracciones musculares severas, sudoración y dolor agudo en humanos.",
-                    nivelPeligrosidad = "Extrema",
-                    venenosa = true,
-                    habitat = "Zonas exteriores rurales, debajo de rocas, rastrojos de trigo, pilas de leña y madrigueras a nivel del suelo.",
-                    distribucion = "Gran extensión silvestre de la zona centro y sur de Chile (Coquimbo a la Región de Los Lagos).",
-                    origen = "Nativo"
-                ),
-                EspecieArana(
-                    nombreCientifico = "Scytodes globula",
-                    nombreComun = "Araña tigre / Araña escupidora",
-                    familia = "Scytodidae",
-                    descripcion = "Fácilmente reconocible por su patrón de franjas amarillas y negras en sus patas largas y delgadas. Captura a sus presas proyectando una goma viscosa mezclada con veneno que inmoviliza a la víctima a distancia. Es el principal depredador y aliado biológico contra la araña de rincón doméstica.",
-                    nivelPeligrosidad = "Inofensiva",
-                    venenosa = true, // technically venomous but absolutely harmless/helpful to humans
-                    habitat = "Interior de viviendas en muros, detrás de muebles altos, bodegas domésticas.",
-                    distribucion = "Todo el territorio de Chile continental urbano.",
-                    origen = "Nativo"
-                ),
-                EspecieArana(
-                    nombreCientifico = "Sicarius terrosus",
-                    nombreComun = "Araña sicario / Araña de arena chilena",
-                    familia = "Sicariidae",
-                    descripcion = "Cuerpo aplanado de color marrón tierra. Tiene el comportamiento asombroso de autorretenido u ocultación bajo la arena o polvo para mimetizarse por completo. Su veneno es necrotizante muy potente, pero al habitar desiertos sus encuentros son extremadamente raros.",
-                    nivelPeligrosidad = "Alta",
-                    venenosa = true,
-                    habitat = "Entornos áridos desérticos, debajo de piedras planas, madrigueras secas de tierra arenosa.",
-                    distribucion = "Zona norte y centro semiárido (Región de Antofagasta hasta Valparaíso).",
-                    origen = "Endémico"
-                ),
-                EspecieArana(
-                    nombreCientifico = "Grammostola rosea",
-                    nombreComun = "Tarántula chilena rosada / Araña pollito",
-                    familia = "Theraphosidae",
-                    descripcion = "Araña de gran tamaño con abundantes vellosidades de tonalidades cafés y reflejos cobrizos o rosados. Su mordedura es de baja toxicidad (similar a una picadura de abeja), y prefiere defenderse soltando pelos urticantes molestos que causan alergias en ojos o piel.",
-                    nivelPeligrosidad = "Inofensiva",
-                    venenosa = true,
-                    habitat = "Madrigueras profundas bajo rocas o troncos secos en cerros y matorral xerofítico.",
-                    distribucion = "Norte y zona central de Chile (Atacama a Biobío).",
-                    origen = "Endémico"
-                ),
-                EspecieArana(
-                    nombreCientifico = "Steatoda nobilis",
-                    nombreComun = "Falsa viuda negra",
-                    familia = "Theridiidae",
-                    descripcion = "Similar en morfología a una viuda negra pero de un color castaño rojizo con patrones dorsales blanquecinos simulando un escudo o calavera. Su mordedura causa dolor localizado y náuseas leves (estearodismo). Es una especie introducida de rápida expansión.",
-                    nivelPeligrosidad = "Media",
-                    venenosa = true,
-                    habitat = "Jardines residenciales urbanos, bodegas, marcos de ventanas exteriores.",
-                    distribucion = "Chile central e insular (muy común en Valparaíso y Santiago).",
-                    origen = "Exótico"
-                )
-            )
-            dao.insertEspecies(initialEspecies)
+    /**
+     * Synchronizes the species list from Supabase to the local Room database.
+     * This ensures the app has up-to-date data and supports offline viewing.
+     */
+    suspend fun refreshSpeciesCache(): Result<Unit> {
+        return try {
+            val remoteSpecies = SupabaseManager.fetchEspeciesFromSupabase()
+            if (remoteSpecies.isNotEmpty()) {
+                // For a clean sync, we could clear and re-insert, or just use REPLACE strategy
+                // dao.deleteAllEspecies() 
+                dao.insertEspecies(remoteSpecies)
+                Log.d("Repository", "Species cache refreshed with ${remoteSpecies.size} items.")
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("Repository", "Failed to refresh species cache", e)
+            Result.failure(e)
         }
+    }
 
-        // Also check if initial user exists
-        val currentUsuario = dao.getUsuario().take(1).firstOrNull()
-        if (currentUsuario == null) {
-            dao.insertUsuario(
-                Usuario(
-                    id = 1,
-                    nombre = "Explorador de Chile",
-                    correo = "explorador@arakno.cl",
-                    celular = "+56 9 8765 4321",
-                    fechaRegistro = System.currentTimeMillis() - 86400000 * 30, // 30 days ago
-                    fotoPerfil = ""
-                )
-            )
+    /**
+     * Fetches and caches the user profile from Supabase.
+     */
+    suspend fun fetchAndCacheUserProfile(email: String): Usuario? {
+        return try {
+            val profileJson = SupabaseManager.fetchUserProfile(email)
+            if (profileJson != null) {
+                val name = profileJson.optString("nombre")
+                val user = Usuario(id = 1, nombre = name, correo = email)
+                dao.insertUsuario(user)
+                user
+            } else null
+        } catch (e: Exception) {
+            Log.e("Repository", "Error fetching user profile", e)
+            null
         }
     }
 
@@ -106,50 +58,50 @@ class AraknoRepository(private val dao: AraknoDao) {
     }
 
     suspend fun insertUsuario(usuario: Usuario) {
-        dao.insertUsuario(usuario)
-        // Sync with Supabase backend
+        // Always ensure we use ID 1 for the current active user in local cache
+        val userToCache = if (usuario.id != 1) usuario.copy(id = 1) else usuario
+        dao.insertUsuario(userToCache)
+        
         try {
-            com.example.network.SupabaseManager.upsertUsuario(usuario)
+            SupabaseManager.upsertUsuario(userToCache)
         } catch (e: Exception) {
-            android.util.Log.e("Repository", "Failed to sync user to Supabase", e)
+            Log.e("Repository", "Failed to sync user to Supabase", e)
         }
     }
 
     suspend fun insertAvistamiento(avistamiento: Avistamiento) {
         dao.insertAvistamiento(avistamiento)
-        // Sync with Supabase backend
         try {
-            com.example.network.SupabaseManager.insertAvistamiento(avistamiento)
+            SupabaseManager.insertAvistamiento(avistamiento)
         } catch (e: Exception) {
-            android.util.Log.e("Repository", "Failed to sync avistamiento to Supabase", e)
+            Log.e("Repository", "Failed to sync avistamiento to Supabase", e)
         }
     }
 
     suspend fun deleteAvistamientoById(id: Int) {
         dao.deleteAvistamientoById(id)
-        // Sync deletion with Supabase backend
         try {
-            com.example.network.SupabaseManager.deleteAvistamiento(id)
+            SupabaseManager.deleteAvistamiento(id)
         } catch (e: Exception) {
-            android.util.Log.e("Repository", "Failed to delete avistamiento from Supabase", e)
+            Log.e("Repository", "Failed to delete avistamiento from Supabase", e)
         }
     }
 
     // --- Authentication ---
 
     suspend fun signIn(email: String, pass: String): String? {
-        return com.example.network.SupabaseManager.signIn(email, pass)
+        return SupabaseManager.signIn(email, pass)
     }
 
     suspend fun signUp(email: String, pass: String): org.json.JSONObject? {
-        return com.example.network.SupabaseManager.signUp(email, pass)
-    }
-
-    suspend fun getUserProfile(email: String): org.json.JSONObject? {
-        return com.example.network.SupabaseManager.fetchUserProfile(email)
+        return SupabaseManager.signUp(email, pass)
     }
 
     fun signOut() {
-        com.example.network.SupabaseManager.signOut()
+        SupabaseManager.signOut()
+    }
+
+    suspend fun clearLocalUser() {
+        dao.clearUsuario()
     }
 }

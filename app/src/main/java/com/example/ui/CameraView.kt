@@ -89,7 +89,7 @@ fun CameraView(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets.safeDrawing,
-        containerColor = Color(0xFF13110F)
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -214,10 +214,11 @@ fun CameraScannerLayout(
                 .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color(0xE613110F)),
+                        colors = listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.9f)),
                         startY = 0f
                     )
                 )
+                .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(vertical = 24.dp, horizontal = 16.dp)
         ) {
             Column(
@@ -226,8 +227,8 @@ fun CameraScannerLayout(
             ) {
                 Text(
                     text = "Encuadra la araña en el visor central",
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -243,13 +244,13 @@ fun CameraScannerLayout(
                         onClick = onGalleryClick,
                         modifier = Modifier
                             .size(52.dp)
-                            .background(Color.White.copy(alpha = 0.12f), CircleShape)
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), CircleShape)
                             .testTag("gallery_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.PhotoLibrary,
                             contentDescription = "Cargar desde Galería",
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
@@ -257,9 +258,9 @@ fun CameraScannerLayout(
                     Box(
                         modifier = Modifier
                             .size(80.dp)
-                            .border(3.dp, Color(0xFFFFAA00), CircleShape)
+                            .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
                             .padding(6.dp)
-                            .background(Color.White, CircleShape)
+                            .background(MaterialTheme.colorScheme.onPrimary, CircleShape)
                             .clickable {
                                 capturePhoto(context, imageCapture, cameraExecutor, onImageCaptured)
                             }
@@ -269,7 +270,7 @@ fun CameraScannerLayout(
                         Icon(
                             imageVector = Icons.Default.CameraAlt,
                             contentDescription = "Capturar",
-                            tint = Color(0xFF13110F),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(36.dp)
                         )
                     }
@@ -281,7 +282,7 @@ fun CameraScannerLayout(
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
-                DemoSpidersSelector(onDemoSelected)
+
             }
         }
     }
@@ -303,26 +304,28 @@ fun SpiderScanningOverlay() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f))
     ) {
         // Visor target frame
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
-                .size(280.dp)
+                .fillMaxWidth(0.75f)
+                .aspectRatio(1f)
                 .align(Alignment.Center)
                 .offset(y = (-40).dp)
-                .border(2.dp, Color(0xFFFFAA00).copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+                .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
         ) {
+            val maxHeight = maxHeight
             // Laser scan line
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp)
                     .align(Alignment.TopCenter)
-                    .offset(y = 280.dp * scanOffset)
+                    .offset(y = maxHeight * scanOffset)
                     .background(
                         Brush.horizontalGradient(
-                            listOf(Color.Transparent, Color(0xFFFFAA00), Color.Transparent)
+                            listOf(Color.Transparent, MaterialTheme.colorScheme.primary, Color.Transparent)
                         )
                     )
             )
@@ -339,7 +342,7 @@ fun PhotoConfirmationScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF13110F))
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
@@ -350,15 +353,15 @@ fun PhotoConfirmationScreen(
         ) {
             Text(
                 text = "Confirmar Imagen",
-                color = Color.White,
-                fontSize = 22.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
                 text = "¿La foto es clara para la identificación?",
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
@@ -370,7 +373,7 @@ fun PhotoConfirmationScreen(
                     .fillMaxHeight(0.6f)
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(16.dp))
-                    .border(2.dp, Color(0xFFFFAA00), RoundedCornerShape(16.dp)),
+                    .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Crop
             )
         }
@@ -387,8 +390,8 @@ fun PhotoConfirmationScreen(
                     .weight(1f)
                     .testTag("repeat_button"),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White.copy(alpha = 0.1f),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -402,8 +405,8 @@ fun PhotoConfirmationScreen(
                     .weight(1f)
                     .testTag("use_photo_button"),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFAA00),
-                    contentColor = Color(0xFF13110F)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -432,22 +435,22 @@ fun NoPermissionScreen(
         Icon(
             imageVector = Icons.Default.Warning,
             contentDescription = null,
-            tint = Color(0xFFFFAA00),
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(64.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "Acceso a la Cámara",
-            color = Color.White,
-            fontSize = 20.sp,
+            color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Requerimos permiso de la cámara para que escanees arañas en vivo. Alternativamente, puedes cargar desde la galería o usar fotos de prueba directas.",
-            color = Color.White.copy(alpha = 0.7f),
-            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 12.dp)
         )
@@ -455,7 +458,7 @@ fun NoPermissionScreen(
 
         Button(
             onClick = onRequestPermission,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFAA00), contentColor = Color(0xFF13110F)),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth().testTag("request_permission_button")
         ) {
@@ -466,7 +469,7 @@ fun NoPermissionScreen(
 
         Button(
             onClick = onGalleryClick,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f), contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), contentColor = MaterialTheme.colorScheme.onSurface),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth().testTag("gallery_permission_fallback_button")
         ) {
@@ -475,56 +478,10 @@ fun NoPermissionScreen(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
-        HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
         Spacer(modifier = Modifier.height(24.dp))
         
-        DemoSpidersSelector(onDemoSelected)
-    }
-}
 
-@Composable
-fun DemoSpidersSelector(onSelected: (Bitmap) -> Unit) {
-    val context = LocalContext.current
-    
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "Prueba Rápida (Sin cámara real)",
-            color = Color(0xFFFFAA00),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-        
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Mock Rincon button
-            Button(
-                onClick = {
-                    val icon = BitmapFactory.decodeResource(context.resources, android.R.drawable.ic_menu_compass)
-                    onSelected(icon ?: Bitmap.createBitmap(150, 150, Bitmap.Config.ARGB_8888))
-                },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E1C0C)),
-                contentPadding = PaddingValues(10.dp)
-            ) {
-                Text("Araña de Rincón", fontSize = 11.sp, color = Color.White)
-            }
-            // Mock Tigre button
-            Button(
-                onClick = {
-                    val icon = BitmapFactory.decodeResource(context.resources, android.R.drawable.ic_menu_compass)
-                    onSelected(icon ?: Bitmap.createBitmap(150, 150, Bitmap.Config.ARGB_8888))
-                },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF132215)),
-                contentPadding = PaddingValues(10.dp)
-            ) {
-                Text("Araña Tigre", fontSize = 11.sp, color = Color.White)
-            }
-        }
     }
 }
 
