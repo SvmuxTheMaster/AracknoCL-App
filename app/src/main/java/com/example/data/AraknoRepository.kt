@@ -1,6 +1,7 @@
 package com.example.data
 
 import com.example.network.SupabaseManager
+import com.example.network.AuthTokens
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import android.util.Log
@@ -43,6 +44,8 @@ class AraknoRepository(private val dao: AraknoDao) {
         return try {
             val profileJson = SupabaseManager.fetchUserProfile(email)
             if (profileJson != null) {
+                val remoteId = profileJson.optInt("id", 0)
+                val authId = if (profileJson.has("auth_id")) profileJson.optString("auth_id") else null
                 val name = profileJson.optString("nombre")
                 val foto = profileJson.optString("foto_perfil")
                 
@@ -50,7 +53,9 @@ class AraknoRepository(private val dao: AraknoDao) {
                 val existing = dao.getUsuario().firstOrNull()
                 
                 val user = Usuario(
-                    id = 1,
+                    id = existing?.id ?: 0,
+                    idRemoto = if (remoteId != 0) remoteId else (existing?.idRemoto ?: 0),
+                    authId = authId ?: existing?.authId,
                     nombre = if (name.isNotEmpty()) name else (existing?.nombre ?: email.substringBefore("@")),
                     correo = email,
                     fotoPerfil = if (foto.isNotEmpty()) foto else (existing?.fotoPerfil ?: "")
@@ -71,13 +76,12 @@ class AraknoRepository(private val dao: AraknoDao) {
         return dao.getEspecieByCientifico(nombreCientifico)
     }
 
-    suspend fun insertUsuario(usuario: Usuario) {
-        // Always ensure we use ID 1 for the current active user in local cache
-        val userToCache = if (usuario.id != 1) usuario.copy(id = 1) else usuario
-        dao.insertUsuario(userToCache)
+    suspend fun insertUsuario(usuario: Usuario, authIdToSync: String? = null) {
+        dao.insertUsuario(usuario)
         
         try {
-            SupabaseManager.upsertUsuario(userToCache)
+            // Task 2: Sync with remote, passing the authId if provided (for registration)
+            SupabaseManager.upsertUsuario(usuario, authIdToSync)
         } catch (e: Exception) {
             Log.e("Repository", "Failed to sync user to Supabase", e)
         }
@@ -115,7 +119,7 @@ class AraknoRepository(private val dao: AraknoDao) {
         return null
     }
 
-    suspend fun signIn(email: String, pass: String): String? {
+    suspend fun signIn(email: String, pass: String): AuthTokens? {
         return SupabaseManager.signIn(email, pass)
     }
 
@@ -123,7 +127,7 @@ class AraknoRepository(private val dao: AraknoDao) {
         return SupabaseManager.signUp(email, pass)
     }
 
-    fun signOut() {
+    suspend fun signOut() {
         SupabaseManager.signOut()
     }
 

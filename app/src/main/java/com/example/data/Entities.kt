@@ -7,6 +7,8 @@ import java.io.Serializable
 @Entity(tableName = "usuarios")
 data class Usuario(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val idRemoto: Int = 0, // ID from Supabase 'usuarios' table
+    val authId: String? = null, // UUID from auth.users
     val nombre: String,
     val correo: String,
     val fechaRegistro: Long = System.currentTimeMillis(),

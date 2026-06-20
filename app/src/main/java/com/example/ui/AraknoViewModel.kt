@@ -9,8 +9,10 @@ import com.example.data.AraknoRepository
 import com.example.data.Avistamiento
 import com.example.data.EspecieArana
 import com.example.data.Usuario
+import com.example.data.SecurePrefs
 import com.example.network.GeminiManager
 import com.example.network.SupabaseManager
+import com.example.network.AuthTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -150,16 +152,13 @@ class AraknoViewModel(private val repository: AraknoRepository) : ViewModel() {
     fun login(email: String, pass: String, context: Context) {
         _authState.value = AuthState.Loading
         viewModelScope.launch {
-            val token = repository.signIn(email, pass)
-            if (token != null) {
-                // Set token in manager immediately
-                SupabaseManager.setToken(token)
+            val tokens = repository.signIn(email, pass)
+            if (tokens != null) {
+                // Set tokens in manager immediately
+                SupabaseManager.setTokens(tokens.accessToken, tokens.refreshToken)
                 
-                // Persistent session
-                context.getSharedPreferences("arakno_prefs", Context.MODE_PRIVATE)
-                    .edit {
-                        putString("supabase_token", token)
-                    }
+                // Secure persistent session
+                SecurePrefs.saveToken(context, tokens.accessToken, tokens.refreshToken)
 
                 // Fetch real profile from Supabase and cache it in Room
                 repository.fetchAndCacheUserProfile(email)
@@ -175,20 +174,20 @@ class AraknoViewModel(private val repository: AraknoRepository) : ViewModel() {
         viewModelScope.launch {
             val result = repository.signUp(email, pass)
             if (result != null) {
-                // If sign up was successful, Supabase might not return token immediately depending on config
-                // But we can try to sign in or just set user info
+                // Task 2: Extract Auth UUID and tokens
                 val token = result.optString("access_token", "")
+                val refresh = result.optString("refresh_token", "")
+                val authUser = result.optJSONObject("user")
+                val authUuid = authUser?.optString("id", "")
+                
                 if (token.isNotEmpty()) {
-                    SupabaseManager.setToken(token)
-                    context.getSharedPreferences("arakno_prefs", Context.MODE_PRIVATE)
-                        .edit {
-                            putString("supabase_token", token)
-                        }
+                    SupabaseManager.setTokens(token, refresh)
+                    SecurePrefs.saveToken(context, token, refresh)
                 }
 
-                // Insert profile to both Supabase and Room
-                val newUsuario = Usuario(id = 1, nombre = nombre, correo = email)
-                repository.insertUsuario(newUsuario)
+                // Insert profile with auth_id for RLS linking
+                val newUsuario = Usuario(id = 1, nombre = nombre, correo = email, authId = authUuid)
+                repository.insertUsuario(newUsuario, authIdToSync = authUuid)
                 _authState.value = AuthState.Authenticated
             } else {
                 _authState.value = AuthState.Error("Error al registrar usuario en Supabase")
@@ -197,15 +196,12 @@ class AraknoViewModel(private val repository: AraknoRepository) : ViewModel() {
     }
 
     fun logout(context: Context) {
-        repository.signOut()
-        _authState.value = AuthState.Idle
-        context.getSharedPreferences("arakno_prefs", Context.MODE_PRIVATE)
-            .edit {
-                remove("supabase_token")
-            }
-
-        // Clear local user data entirely (no more Explorador de Chile)
         viewModelScope.launch {
+            repository.signOut()
+            _authState.value = AuthState.Idle
+            SecurePrefs.clear(context)
+
+            // Clear local user data entirely
             repository.clearLocalUser()
         }
     }
@@ -252,9 +248,13 @@ class AraknoViewModel(private val repository: AraknoRepository) : ViewModel() {
                 _analysisState.value = AnalysisState.Success(result, bitmap)
                 
                 if (result.spiderFound && result.especie != null) {
+                    // Task 2: Use the real remote ID for the foreign key, or local id as fallback
+                    val currentUserId = usuario.value?.idRemoto ?: 1
+                    
                     repository.insertAvistamiento(
                         Avistamiento(
                             urlImagen = "",
+                            idUsuario = currentUserId,
                             ubicacionNombre = locationName,
                             confianza = result.confianza,
                             resultadoEspecie = result.especie.nombreCientifico,

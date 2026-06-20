@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import com.example.data.AraknoDatabase
 import com.example.data.AraknoRepository
+import com.example.data.SecurePrefs
 import com.example.network.SupabaseManager
 import androidx.core.content.edit
 import kotlinx.coroutines.CoroutineScope
@@ -19,10 +20,22 @@ class AraknoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Restore session
-        val prefs = getSharedPreferences("arakno_prefs", Context.MODE_PRIVATE)
-        val token = prefs.getString("supabase_token", null)
-        SupabaseManager.setToken(token)
+        // Restore session with migration to SecurePrefs
+        val legacyPrefs = getSharedPreferences("arakno_prefs", Context.MODE_PRIVATE)
+        val legacyToken = legacyPrefs.getString("supabase_token", null)
+        
+        if (legacyToken != null) {
+            SecurePrefs.saveToken(this, legacyToken)
+            legacyPrefs.edit { clear() }
+        }
+
+        val token = SecurePrefs.getAccessToken(this)
+        val refreshToken = SecurePrefs.getRefreshToken(this)
+        SupabaseManager.setTokens(token, refreshToken)
+        
+        SupabaseManager.onTokensRefreshed = { tokens ->
+            SecurePrefs.saveToken(this, tokens.accessToken, tokens.refreshToken)
+        }
 
         applicationScope.launch {
             repository.refreshSpeciesCache()
